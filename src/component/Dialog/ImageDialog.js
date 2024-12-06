@@ -25,28 +25,27 @@ const {Option} = Select;
 class ImageDialog extends Component {
   constructor(props) {
     super(props);
+    this.state = {
+      activeTab: "1"
+    };
     this.images = [];
   }
 
-  // 确认后将内容更新到编辑器上
   handleOk = () => {
     let text = "";
-    // 成功后添加url
     if (this.props.navbar.isContainImgName) {
-      this.images.forEach((value) => {
+      for (const value of this.images) {
         text += `![${value.filename}](${value.url})\n`;
-      });
+      }
     } else {
-      this.images.forEach((value) => {
+      for (const value of this.images) {
         text += `![](${value.url})\n`;
-      });
+      }
     }
-    // 重新初始化
     this.images = [];
     const {markdownEditor} = this.props.content;
     const cursor = markdownEditor.getCursor();
     markdownEditor.replaceSelection(text, cursor);
-    // 上传后实时更新内容
     const content = markdownEditor.getValue();
     this.props.content.setContent(content);
 
@@ -68,29 +67,20 @@ class ImageDialog extends Component {
         formData.append(key, data[key]);
       });
     }
-    // 使用阿里云图床
-    if (this.props.imageHosting.type === "阿里云") {
-      uploadAdaptor({file, onSuccess, onError, images});
-    }
-    // 使用七牛云图床
-    else if (this.props.imageHosting.type === "七牛云") {
-      uploadAdaptor({file, onSuccess, onError, onProgress, images});
-    }
-    // 使用SM.MS图床
-    else if (this.props.imageHosting.type === "SM.MS") {
-      uploadAdaptor({formData, file, action, onProgress, onSuccess, onError, headers, withCredentials});
-    }
-    // 使用Gitee图床
-    else if (this.props.imageHosting.type === "Gitee") {
-      uploadAdaptor({formData, file, action, onProgress, onSuccess, onError, headers, withCredentials, images});
-    }
-    // 使用GitHub图床
-    else if (this.props.imageHosting.type === "GitHub") {
-      uploadAdaptor({formData, file, action, onProgress, onSuccess, onError, headers, withCredentials, images});
-    }
-    // 使用用户提供的图床或是默认mdnice图床
-    else {
-      uploadAdaptor({formData, file, onSuccess, onError, images});
+
+    switch (this.props.imageHosting.type) {
+      case IMAGE_HOSTING_NAMES.aliyun:
+        uploadAdaptor({file, onSuccess, onError, images});
+        break;
+      case IMAGE_HOSTING_NAMES.qiniuyun:
+        uploadAdaptor({file, onSuccess, onError, onProgress, images});
+        break;
+      case IMAGE_HOSTING_NAMES.gitee:
+      case IMAGE_HOSTING_NAMES.github:
+        uploadAdaptor({formData, file, action, onProgress, onSuccess, onError, headers, withCredentials, images});
+        break;
+      default: // SM.MS 或其他图床
+        uploadAdaptor({formData, file, action, onProgress, onSuccess, onError, headers, withCredentials});
     }
 
     return {
@@ -101,74 +91,75 @@ class ImageDialog extends Component {
   };
 
   typeChange = (type) => {
-    // 确保类型是有效的
     if (Object.values(IMAGE_HOSTING_NAMES).includes(type)) {
       this.props.imageHosting.setType(type);
       window.localStorage.setItem(IMAGE_HOSTING_TYPE, type);
     }
   };
 
-  render() {
+  renderImageHostingConfig = () => {
     const {type} = this.props.imageHosting;
     
-    // 构建图床选择器选项
-    const options = Object.entries(IMAGE_HOSTING_NAMES).map(([key, value]) => (
-      <Option key={key} value={value}>
-        {value}
-      </Option>
-    ));
-
-    const imageHostingSwitch = (
-      <Select style={{width: "120px"}} value={type} onChange={this.typeChange}>
-        {options}
-      </Select>
+    return (
+      <div>
+        <div style={{ marginBottom: 16 }}>
+          <span style={{ marginRight: 8 }}>选择图床：</span>
+          <Select 
+            style={{width: "200px"}} 
+            value={type} 
+            onChange={this.typeChange}
+          >
+            {Object.entries(IMAGE_HOSTING_NAMES).map(([key, value]) => (
+              <Option key={key} value={value}>
+                {value}
+              </Option>
+            ))}
+          </Select>
+        </div>
+        
+        <div>
+          {type === IMAGE_HOSTING_NAMES.aliyun && <AliOSS />}
+          {type === IMAGE_HOSTING_NAMES.qiniuyun && <QiniuOSS />}
+          {type === IMAGE_HOSTING_NAMES.gitee && <Gitee />}
+          {type === IMAGE_HOSTING_NAMES.github && <GitHub />}
+        </div>
+      </div>
     );
+  };
+
+  render() {
+    const {type} = this.props.imageHosting;
+    const {activeTab} = this.state;
 
     return (
       <Modal
-        title="本地上传"
+        title="图片上传"
         okText="确认"
         cancelText="取消"
         visible={this.props.dialog.isImageOpen}
         onOk={this.handleOk}
         onCancel={this.handleCancel}
         bodyStyle={{paddingTop: "10px"}}
+        width={600}
       >
-        <appContext.Consumer>
-          {({useImageHosting}) => (
-            <Tabs tabBarExtraContent={imageHostingSwitch} type="card">
-              <TabPane tab="图片上传" key="1">
-                <Dragger name="file" multiple action={SM_MS_PROXY} customRequest={this.customRequest}>
-                  <p className="ant-upload-drag-icon">
-                    <SvgIcon name="inbox" style={style.svgIcon} fill="#40a9ff" />
-                  </p>
-                  <p className="ant-upload-text">点击或拖拽一张或多张照片上传</p>
-                  <p className="ant-upload-hint">{"正在使用" + type + "图床"}</p>
-                </Dragger>
-              </TabPane>
-              {useImageHosting.isAliyunOpen ? (
-                <TabPane tab={IMAGE_HOSTING_NAMES.aliyun} key="2">
-                  <AliOSS />
-                </TabPane>
-              ) : null}
-              {useImageHosting.isQiniuyunOpen ? (
-                <TabPane tab={IMAGE_HOSTING_NAMES.qiniuyun} key="3">
-                  <QiniuOSS />
-                </TabPane>
-              ) : null}
-              {useImageHosting.isGiteeOpen ? (
-                <TabPane tab={IMAGE_HOSTING_NAMES.gitee} key="4">
-                  <Gitee />
-                </TabPane>
-              ) : null}
-              {useImageHosting.isGitHubOpen ? (
-                <TabPane tab={IMAGE_HOSTING_NAMES.github} key="5">
-                  <GitHub />
-                </TabPane>
-              ) : null}
-            </Tabs>
-          )}
-        </appContext.Consumer>
+        <Tabs 
+          activeKey={activeTab}
+          onChange={(key) => this.setState({ activeTab: key })}
+          type="card"
+        >
+          <TabPane tab="图片上传" key="1">
+            <Dragger name="file" multiple action={SM_MS_PROXY} customRequest={this.customRequest}>
+              <p className="ant-upload-drag-icon">
+                <SvgIcon name="inbox" style={style.svgIcon} fill="#40a9ff" />
+              </p>
+              <p className="ant-upload-text">点击或拖拽一张或多张照片上传</p>
+              <p className="ant-upload-hint">{`正在使用${type}图床`}</p>
+            </Dragger>
+          </TabPane>
+          <TabPane tab="图床配置" key="2">
+            {this.renderImageHostingConfig()}
+          </TabPane>
+        </Tabs>
       </Modal>
     );
   }
