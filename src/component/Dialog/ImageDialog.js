@@ -8,6 +8,7 @@ import AliOSS from "../ImageHosting/AliOSS";
 import QiniuOSS from "../ImageHosting/QiniuOSS";
 import Gitee from "../ImageHosting/Gitee";
 import GitHub from "../ImageHosting/GitHub";
+import TencentCOS from "../ImageHosting/TencentCOS";
 
 import {uploadAdaptor} from "../../utils/imageHosting";
 import {SM_MS_PROXY, IMAGE_HOSTING_TYPE, IMAGE_HOSTING_NAMES} from "../../utils/constant";
@@ -70,17 +71,35 @@ class ImageDialog extends Component {
 
     switch (this.props.imageHosting.type) {
       case IMAGE_HOSTING_NAMES.aliyun:
-        uploadAdaptor({file, onSuccess, onError, images});
+        uploadAdaptor({file, onSuccess: (image) => {
+          this.images.push(image);
+          onSuccess(image);
+        }, onError, images});
         break;
       case IMAGE_HOSTING_NAMES.qiniuyun:
-        uploadAdaptor({file, onSuccess, onError, onProgress, images});
+        uploadAdaptor({file, onSuccess: (image) => {
+          this.images.push(image);
+          onSuccess(image);
+        }, onError, onProgress, images});
         break;
       case IMAGE_HOSTING_NAMES.gitee:
       case IMAGE_HOSTING_NAMES.github:
-        uploadAdaptor({formData, file, action, onProgress, onSuccess, onError, headers, withCredentials, images});
+        uploadAdaptor({formData, file, action, onProgress, onSuccess: (image) => {
+          this.images.push(image);
+          onSuccess(image);
+        }, onError, headers, withCredentials, images});
+        break;
+      case IMAGE_HOSTING_NAMES.tencent:
+        uploadAdaptor({file, onSuccess: (image) => {
+          this.images.push(image);
+          onSuccess(image);
+        }, onError, onProgress, images});
         break;
       default: // SM.MS 或其他图床
-        uploadAdaptor({formData, file, action, onProgress, onSuccess, onError, headers, withCredentials});
+        uploadAdaptor({formData, file, action, onProgress, onSuccess: (image) => {
+          this.images.push(image);
+          onSuccess(image);
+        }, onError, headers, withCredentials});
     }
 
     return {
@@ -122,6 +141,7 @@ class ImageDialog extends Component {
           {type === IMAGE_HOSTING_NAMES.qiniuyun && <QiniuOSS />}
           {type === IMAGE_HOSTING_NAMES.gitee && <Gitee />}
           {type === IMAGE_HOSTING_NAMES.github && <GitHub />}
+          {type === IMAGE_HOSTING_NAMES.tencent && <TencentCOS />}
         </div>
       </div>
     );

@@ -86,11 +86,7 @@ export const replaceImagePath = (markdown, oldPath, newPath) => {
 };
 
 // 处理外部图片
-export const processExternalImages = async (
-  markdown,
-  content,
-  onProgress
-) => {
+export const processExternalImages = async (markdown, content, onProgress) => {
   try {
     const images = extractImagesFromMarkdown(markdown);
     const externalImages = images.filter(img => img.path.startsWith('http'));
@@ -107,12 +103,29 @@ export const processExternalImages = async (
       try {
         // 下载图片
         const response = await fetch(img.path);
-        const blob = await response.blob();
+        if (!response.ok) {
+          throw new Error(`Failed to fetch image: ${response.statusText}`);
+        }
         
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.startsWith('image/')) {
+          throw new Error('Invalid image content type');
+        }
+
+        const blob = await response.blob();
+        if (blob.size === 0) {
+          throw new Error('Empty image file');
+        }
+
         // 根据 URL 和 Content-Type 生成文件名
         const urlParts = img.path.split('/');
-        const fileName = urlParts[urlParts.length - 1].split('?')[0] || 'image.png';
-        const file = new File([blob], fileName, { type: blob.type || 'image/png' });
+        let fileName = urlParts[urlParts.length - 1].split('?')[0];
+        if (!fileName || fileName.indexOf('.') === -1) {
+          const ext = contentType.split('/')[1] || 'png';
+          fileName = `image-${Date.now()}.${ext}`;
+        }
+
+        const file = new File([blob], fileName, { type: contentType });
 
         // 上传到配置的图床
         const result = await new Promise((resolve, reject) => {
@@ -120,7 +133,8 @@ export const processExternalImages = async (
             file,
             content,
             onSuccess: (response) => resolve(response),
-            onError: (error) => reject(error)
+            onError: (error) => reject(error),
+            images: []
           });
         });
 
@@ -136,7 +150,7 @@ export const processExternalImages = async (
         }
       } catch (error) {
         console.error(`处理图片失败: ${img.path}`, error);
-        message.error(`处理图片失败: ${img.path}`);
+        message.error(`处理图片失败: ${img.path} - ${error.message}`);
       }
     }
 

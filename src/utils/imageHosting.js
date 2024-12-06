@@ -5,6 +5,7 @@ import * as qiniu from "qiniu-js";
 import {message} from "antd";
 import axios from "axios";
 import OSS from "ali-oss";
+import COS from "cos-js-sdk-v5";
 import imageHosting from "../store/imageHosting";
 
 import {
@@ -13,6 +14,7 @@ import {
   QINIUOSS_IMAGE_HOSTING,
   GITEE_IMAGE_HOSTING,
   GITHUB_IMAGE_HOSTING,
+  TENCENT_IMAGE_HOSTING,
   IMAGE_HOSTING_TYPE,
   IS_CONTAIN_IMG_NAME,
   IMAGE_HOSTING_NAMES,
@@ -34,7 +36,6 @@ function hideUploadNoti() {
 
 function writeToEditor({content, image}) {
   const isContainImgName = window.localStorage.getItem(IS_CONTAIN_IMG_NAME) === "true";
-  console.log(isContainImgName);
   let text = "";
   if (isContainImgName) {
     text = `\n![${image.filename}](${image.url})\n`;
@@ -61,7 +62,7 @@ export const qiniuOSSUpload = async ({
   try {
     let {domain} = config;
     const {namespace} = config;
-    // domain可能配置时末尾没有加‘/’
+    // domain可能配置时末尾没有加'/'
     if (domain[domain.length - 1] !== "/") {
       domain += "/";
     }
@@ -102,7 +103,6 @@ export const qiniuOSSUpload = async ({
 
       // 上传成功后回调
       const complete = (response) => {
-        // console.log(response);
         const names = file.name.split(".");
         names.pop();
         const filename = names.join(".");
@@ -123,8 +123,7 @@ export const qiniuOSSUpload = async ({
 
       // 上传过程回调
       const next = (response) => {
-        // console.log(response);
-        const percent = parseInt(Math.round(response.total.percent.toFixed(2)), 10);
+        const percent = Number.parseInt(Math.round(response.total.percent.toFixed(2)), 10);
         onProgress(
           {
             percent,
@@ -218,7 +217,7 @@ export const smmsUpload = ({
       onUploadProgress: ({total, loaded}) => {
         onProgress(
           {
-            percent: parseInt(Math.round((loaded / total) * 100).toFixed(2), 10),
+            percent: Number.parseInt(Math.round((loaded / total) * 100).toFixed(2), 10),
           },
           file,
         );
@@ -254,7 +253,7 @@ const aliOSSPutObject = ({config, file, buffer, onSuccess, onError, images, cont
   try {
     client = new OSS(config);
   } catch (error) {
-    message.error("OSS配置错误，请根据文档检查配置项");
+    message.error("OSS配置错误，请根据文档检查置项");
     return;
   }
 
@@ -352,7 +351,7 @@ export const giteeUpload = ({
     const seperator = "-";
     const dir = date.getFullYear() + seperator + (date.getMonth() + 1) + seperator + date.getDate();
 
-    const dateFilename = new Date().getTime() + "-" + file.name;
+    const dateFilename = `${new Date().getTime()}-${file.name}`;
     const url = `https://gitee.com/api/v5/repos/${config.username}/${config.repo}/contents/${dir}/${dateFilename}`;
 
     formData.append("content", base64);
@@ -366,7 +365,7 @@ export const giteeUpload = ({
         onUploadProgress: ({total, loaded}) => {
           onProgress(
             {
-              percent: parseInt(Math.round((loaded / total) * 100).toFixed(2), 10),
+              percent: Number.parseInt(Math.round((loaded / total) * 100).toFixed(2), 10),
             },
             file,
           );
@@ -394,8 +393,8 @@ export const giteeUpload = ({
       })
       .catch((error, info) => {
         hideUploadNoti();
-        uploadError(error.toString() + " 可能存在图片名重复等问题");
-        onError(error, error.toString() + " 可能存在图片名重复等��题");
+        uploadError(`${error.toString()} 可能存在图片名重复等问题`);
+        onError(error, `${error.toString()} 可能存在图片名重复等问题`);
       });
   };
 };
@@ -441,7 +440,7 @@ export const githubUpload = ({
       const date = new Date();
       const seperator = "-";
       const dir = date.getFullYear() + seperator + (date.getMonth() + 1) + seperator + date.getDate();
-      const dateFilename = new Date().getTime() + "-" + file.name;
+      const dateFilename = `${new Date().getTime()}-${file.name}`;
       const path = `${dir}/${dateFilename}`;
 
       // 构建API URL（不包含token）
@@ -468,7 +467,7 @@ export const githubUpload = ({
           onUploadProgress: ({total, loaded}) => {
             onProgress(
               {
-                percent: parseInt(Math.round((loaded / total) * 100).toFixed(2), 10),
+                percent: Number.parseInt(Math.round((loaded / total) * 100).toFixed(2), 10),
               },
               file,
             );
@@ -508,7 +507,7 @@ export const githubUpload = ({
         if (error.response) {
           switch (error.response.status) {
             case 401:
-              errorMessage = "GitHub Token 无效或已过期";
+              errorMessage = "GitHub Token 无效或已期";
               break;
             case 403:
               errorMessage = "没有仓库写入权限，请检查 Token 权限设置";
@@ -532,15 +531,76 @@ export const githubUpload = ({
   };
 };
 
+// 修改腾讯云上传函数
+const tencentCOSUpload = ({file, onSuccess = () => {}, onError = () => {}, onProgress = () => {}, images = [], content = null}) => {
+  showUploadNoti();
+  const config = JSON.parse(window.localStorage.getItem(TENCENT_IMAGE_HOSTING));
+  if (!config || !config.secretId || !config.secretKey || !config.bucket || !config.region) {
+    message.error("请先配置腾讯云 COS 参数");
+    onError(new Error("配置信息不完整"));
+    return;
+  }
+
+  const cos = new COS({
+    SecretId: config.secretId,
+    SecretKey: config.secretKey
+  });
+
+  const date = new Date();
+  const path = `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+  const fileName = `${path}/${Date.now()}-${file.name}`;
+
+  cos.putObject({
+    Bucket: config.bucket,
+    Region: config.region,
+    Key: fileName,
+    Body: file,
+    onProgress: (progressData) => {
+      const percent = Number.parseInt(Math.round((progressData.loaded / progressData.total) * 100).toFixed(2), 10);
+      onProgress({percent}, file);
+    }
+  }, (err, data) => {
+    hideUploadNoti();
+    if (err) {
+      uploadError(`上传失败：${err.message}`);
+      onError(err);
+      return;
+    }
+    
+    const url = `https://${config.bucket}.cos.${config.region}.myqcloud.com/${fileName}`;
+    const names = file.name.split(".");
+    names.pop();
+    const filename = names.join(".");
+    const image = {
+      filename,
+      url
+    };
+
+    if (content) {
+      writeToEditor({content, image});
+    }
+    images.push(image);
+    onSuccess(image);
+    setTimeout(() => {
+      hideUploadNoti();
+    }, 500);
+  });
+};
+
 // 自动检测上传配置，进行上传
-export const uploadAdaptor = (...args) => {
-  const type = localStorage.getItem(IMAGE_HOSTING_TYPE); // SM.MS | 阿里云 | 七牛云 | Gitee | GitHub | 用户自定义图床
+export const uploadAdaptor = ({formData = new FormData(), file, action, onProgress = () => {}, onSuccess = () => {}, onError = () => {}, headers = {}, withCredentials = false, images = [], content = null}) => {
+  const type = localStorage.getItem(IMAGE_HOSTING_TYPE);
   const userType = imageHosting.hostingName;
+  
   if (type === userType) {
-    return customImageUpload(...args);
-  } else if (type === IMAGE_HOSTING_NAMES.smms) {
-    return smmsUpload(...args);
-  } else if (type === IMAGE_HOSTING_NAMES.qiniuyun) {
+    return customImageUpload({formData, file, onSuccess, onError, images, content});
+  }
+  
+  if (type === IMAGE_HOSTING_NAMES.smms) {
+    return smmsUpload({formData, file, action, onProgress, onSuccess, onError, headers, withCredentials, images, content});
+  }
+  
+  if (type === IMAGE_HOSTING_NAMES.qiniuyun) {
     const config = JSON.parse(window.localStorage.getItem(QINIUOSS_IMAGE_HOSTING));
     if (
       !config.region.length ||
@@ -552,8 +612,10 @@ export const uploadAdaptor = (...args) => {
       message.error("请先配置七牛云图床");
       return false;
     }
-    return qiniuOSSUpload(...args);
-  } else if (type === IMAGE_HOSTING_NAMES.aliyun) {
+    return qiniuOSSUpload({file, onSuccess, onError, onProgress, images, content});
+  }
+  
+  if (type === IMAGE_HOSTING_NAMES.aliyun) {
     const config = JSON.parse(window.localStorage.getItem(ALIOSS_IMAGE_HOSTING));
     if (
       !config.region.length ||
@@ -564,21 +626,35 @@ export const uploadAdaptor = (...args) => {
       message.error("请先配置阿里云图床");
       return false;
     }
-    return aliOSSUpload(...args);
-  } else if (type === IMAGE_HOSTING_NAMES.gitee) {
+    return aliOSSUpload({file, onSuccess, onError, images, content});
+  }
+  
+  if (type === IMAGE_HOSTING_NAMES.gitee) {
     const config = JSON.parse(window.localStorage.getItem(GITEE_IMAGE_HOSTING));
     if (!config.username.length || !config.repo.length || !config.token.length) {
       message.error("请先配置 Gitee 图床");
       return false;
     }
-    return giteeUpload(...args);
-  } else if (type === IMAGE_HOSTING_NAMES.github) {
+    return giteeUpload({formData, file, onProgress, onSuccess, onError, headers, withCredentials, images, content});
+  }
+  
+  if (type === IMAGE_HOSTING_NAMES.github) {
     const config = JSON.parse(window.localStorage.getItem(GITHUB_IMAGE_HOSTING));
     if (!config.username.length || !config.repo.length || !config.token.length) {
       message.error("请先配置 GitHub 图床");
       return false;
     }
-    return githubUpload(...args);
+    return githubUpload({formData, file, onProgress, onSuccess, onError, headers, withCredentials, images, content});
   }
+  
+  if (type === IMAGE_HOSTING_NAMES.tencent) {
+    const config = JSON.parse(window.localStorage.getItem(TENCENT_IMAGE_HOSTING));
+    if (!config || !config.secretId || !config.secretKey || !config.bucket || !config.region) {
+      message.error("请先配置腾讯云 COS 参数");
+      return false;
+    }
+    return tencentCOSUpload({file, onSuccess, onError, onProgress, images, content});
+  }
+  
   return true;
-};
+}; 
