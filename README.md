@@ -59,6 +59,7 @@
 - 📥 支持导出 PDF 和 Markdown
 - 🖼️ 支持多种图床
   - GitHub 图床
+  - 腾讯云 COS 图床
   - 其他图床开发中...
 - 🌈 提供多种主题选择
 
@@ -73,6 +74,15 @@
      - 用户名：GitHub 用户名
      - 仓库名：用于存储图片的仓库
      - 分支名：默认为 main
+
+2. 腾讯云 COS 图床配置：
+   - 在腾讯云控制台创建存储桶（Bucket）
+   - 获取访问密钥（SecretId 和 SecretKey）
+   - 在应用设置中配置腾讯云 COS 信息：
+     - SecretId：访问密钥 ID
+     - SecretKey：访问密钥密码
+     - Bucket：存储桶名称（格式：BucketName-APPID）
+     - Region：存储桶所在地域（例如：ap-nanjing）
 
 ### 环境要求
 
