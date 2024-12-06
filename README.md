@@ -97,17 +97,29 @@
    git clone https://github.com/yourusername/markdown2html-obsidian.git
    ```
 
-2. 安装依赖：
+2. 配置 Git（重要）：
+   ```bash
+   # 配置 pull 策略为 merge（推荐）
+   git config pull.rebase false
+   
+   # 或者使用 rebase 策略
+   # git config pull.rebase true
+   
+   # 或者只允许 fast-forward
+   # git config pull.ff only
+   ```
+
+3. 安装依赖：
    ```bash
    yarn install
    ```
 
-3. 启动开发服务器：
+4. 启动开发服务器：
    ```bash
    npm run start
    ```
 
-4. 构建项目：
+5. 构建项目：
    ```bash
    npm run build
    ```
