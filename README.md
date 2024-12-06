@@ -10,8 +10,9 @@
 - 支持自定义样式的 Markdown 编辑器
 - 支持微信公众号、知乎和稀土掘金
 - 支持公式
-- 支持html转markdwon
+- 支持html转markdown
 - 支持导出pdf和markdown
+- 支持 Obsidian 一键排版
 - 欢迎[在线使用](http://md.aizhuanqian.online/)
 
 ## 主题
@@ -46,6 +47,33 @@
 
 确保在项目启动前，已正确配置环境变量和依赖。
 
+## Obsidian 插件使用说明
+
+### 安装插件
+
+1. 下载 `obsidian-plugin` 目录
+2. 将其复制到你的 Obsidian 插件目录（通常是 `.obsidian/plugins/obsidian-markdown2html`）
+3. 在 Obsidian 中启用插件
+
+### 使用方法
+
+1. 在 Obsidian 中打开任意 Markdown 文件
+2. 点击左侧边栏的文档图标，或使用命令面板（Ctrl+P）输入"在浏览器中打开当前文档"
+3. 文档将自动在浏览器中打开，并完成内容同步
+
+### 配置说明
+
+1. 在 Obsidian 设置中找到 "Markdown2HTML" 设置选项
+2. 配置服务器��址（默认为 `http://localhost:3000`）
+3. 如果你使用在线服务，可以将地址改为 `http://md.aizhuanqian.online`
+
+### 特性
+
+- 一键排版：直接从 Obsidian 转换到美化编辑器
+- 自动同步：无需手动复制粘贴，内容自动同步
+- 保留格式：完整保留 Markdown 格式和图片
+- 支持图片：自动处理和上传图片到配置的图床
+
 ## 友情链接
 
 - [markdown nice](https://mdnice.com/)：markdown nice
@@ -62,6 +90,7 @@
   - 腾讯云 COS 图床
   - 其他图床开发中...
 - 🌈 提供多种主题选择
+- 🔗 支持 Obsidian 一键排版
 
 ## 使用说明
 
