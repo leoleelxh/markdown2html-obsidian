@@ -271,8 +271,9 @@ const aliOSSPutObject = ({config, file, buffer, onSuccess, onError, images, cont
       };
       if (content) {
         writeToEditor({content, image});
+      } else {
+        images.push(image);
       }
-      images.push(image);
       onSuccess(response, file);
       setTimeout(() => {
         hideUploadNoti();
@@ -384,9 +385,10 @@ export const giteeUpload = ({
         };
         if (content) {
           writeToEditor({content, image});
+        } else {
+          images.push(image);
         }
-        images.push(image);
-        onSuccess(response, file);
+        onSuccess(response);
         setTimeout(() => {
           hideUploadNoti();
         }, 500);
@@ -482,7 +484,6 @@ export const githubUpload = ({
         names.pop();
         const filename = names.join(".");
 
-        // 根据配置决定使用 jsDelivr CDN 还是原始 URL
         const imageUrl = config.jsdelivr === "true"
           ? `https://cdn.jsdelivr.net/gh/${config.username}/${config.repo}/${path}`
           : response.data.content.download_url;
@@ -494,8 +495,10 @@ export const githubUpload = ({
 
         if (content) {
           writeToEditor({content, image});
+        } else {
+          images.push(image);
         }
-        images.push(image);
+
         onSuccess(response.data);
         setTimeout(() => {
           hideUploadNoti();
@@ -576,10 +579,14 @@ const tencentCOSUpload = ({file, onSuccess = () => {}, onError = () => {}, onPro
       url
     };
 
+    // 只在 content 存在时写入编辑器��避免重复写入
     if (content) {
       writeToEditor({content, image});
+    } else {
+      // 如果没有 content，则只添加到 images 数组
+      images.push(image);
     }
-    images.push(image);
+    
     onSuccess(image);
     setTimeout(() => {
       hideUploadNoti();
