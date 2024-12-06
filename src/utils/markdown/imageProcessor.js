@@ -9,15 +9,15 @@ export const isImageFile = (file) => {
 // 从 Markdown 文本中提取图片信息
 export const extractImagesFromMarkdown = (markdown) => {
   const images = [];
-  // 匹配 markdown 图片语法: ![alt](url "title")
-  const imageRegex = /!\[(.*?)\]\((.*?)(?:\s+"(.*?)")?\)/g;
+  // 同时匹配标准 Markdown 格式和微信 @ 格式
+  const imageRegex = /(?:!\[(.*?)\]\((.*?)(?:\s+"(.*?)")?\)|@(https?:\/\/[^\s<]+?(?:\.jpg|\.jpeg|\.png|\.gif)))/gi;
   let match;
   
   while ((match = imageRegex.exec(markdown)) !== null) {
     images.push({
-      alt: match[1],
-      path: match[2],
-      title: match[3]
+      alt: match[1] || '',
+      path: match[2] || match[4], // match[4] 用于 @ 格式的链接
+      title: match[3] || ''
     });
   }
 
@@ -79,10 +79,18 @@ export const compressImage = async (
 
 // 替换 Markdown 中的图片路径
 export const replaceImagePath = (markdown, oldPath, newPath) => {
-  // 转义正则表达式中的特殊字符
   const escapedOldPath = oldPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`(!\\[.*?\\])\\(${escapedOldPath}(?:\\s+".*?")?\\)`, 'g');
-  return markdown.replace(regex, `$1(${newPath})`);
+  // 同时匹配两种格式并相应替换
+  const regex = new RegExp(`(!\\[.*?\\])\\(${escapedOldPath}(?:\\s+".*?")?\\)|@${escapedOldPath}`, 'g');
+  return markdown.replace(regex, (match) => {
+    if (match.startsWith('@')) {
+      // 如果是微信格式，转换为标准 Markdown 格式
+      return `![](${newPath})`;
+    } else {
+      // 标准 Markdown 格式直接替换路径
+      return match.replace(oldPath, newPath);
+    }
+  });
 };
 
 // 处理外部图片

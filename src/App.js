@@ -116,7 +116,7 @@ class App extends Component {
         this.props.content.setContent(processedContent);
       } catch (error) {
         console.error('处理图片失败:', error);
-        // 如果处理失败，至少显示原始内容
+        // 如果处理���败，至少显示原始内容
         this.props.content.setContent(decodedContent);
       }
     }
@@ -312,7 +312,6 @@ class App extends Component {
         content,
         this.props.content,
         (current, total) => {
-          // 可以在这里添加进度显示
           console.log(`处理图片进度: ${current}/${total}`);
         }
       );
