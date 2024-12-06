@@ -105,7 +105,7 @@ export const markdownParser = new MarkdownIt({
     if (lang === undefined || lang === "") {
       lang = "bash";
     }
-    // 加上custom则表示自定义样式，而非微信专属，避免被remove pre
+    // 加上custom则表示自定义样式，��非微信专属，避免被remove pre
     if (lang && highlightjs.getLanguage(lang)) {
       try {
         const formatted = highlightjs
@@ -276,9 +276,15 @@ export const addStyleLabel = (styleLabels) => {
 };
 
 export const updateMathjax = () => {
-  window.MathJax.texReset();
-  window.MathJax.typesetClear();
-  window.MathJax.typesetPromise();
+  try {
+    if (window.MathJax && window.MathJax.typesetPromise) {
+      window.MathJax.typesetPromise();
+    } else {
+      console.warn('MathJax not loaded yet');
+    }
+  } catch (error) {
+    console.error('Error updating MathJax:', error);
+  }
 };
 
 export const download = (content, filename) => {

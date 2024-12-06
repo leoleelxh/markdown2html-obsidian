@@ -40,12 +40,13 @@ var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
         const editor = activeView.editor;
         const content = editor.getValue();
         try {
-          await navigator.clipboard.writeText(content);
-          new import_obsidian.Notice("\u5DF2\u590D\u5236 Markdown \u5185\u5BB9\u5230\u526A\u8D34\u677F");
-          window.open(this.settings.serverUrl, "_blank");
+          const encodedContent = encodeURIComponent(content);
+          const url = `${this.settings.serverUrl}?content=${encodedContent}`;
+          window.open(url, "_blank");
+          new import_obsidian.Notice("\u5DF2\u5728\u6D4F\u89C8\u5668\u4E2D\u6253\u5F00\u7F16\u8F91\u5668");
         } catch (error) {
           console.error("Error:", error);
-          new import_obsidian.Notice("\u590D\u5236\u5185\u5BB9\u5931\u8D25");
+          new import_obsidian.Notice("\u6253\u5F00\u7F16\u8F91\u5668\u5931\u8D25");
         }
       } else {
         new import_obsidian.Notice("\u8BF7\u5148\u6253\u5F00\u4E00\u4E2A Markdown \u6587\u4EF6");
@@ -57,12 +58,13 @@ var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
       editorCallback: async (editor) => {
         const content = editor.getValue();
         try {
-          await navigator.clipboard.writeText(content);
-          new import_obsidian.Notice("\u5DF2\u590D\u5236 Markdown \u5185\u5BB9\u5230\u526A\u8D34\u677F");
-          window.open(this.settings.serverUrl, "_blank");
+          const encodedContent = encodeURIComponent(content);
+          const url = `${this.settings.serverUrl}?content=${encodedContent}`;
+          window.open(url, "_blank");
+          new import_obsidian.Notice("\u5DF2\u5728\u6D4F\u89C8\u5668\u4E2D\u6253\u5F00\u7F16\u8F91\u5668");
         } catch (error) {
           console.error("Error:", error);
-          new import_obsidian.Notice("\u590D\u5236\u5185\u5BB9\u5931\u8D25");
+          new import_obsidian.Notice("\u6253\u5F00\u7F16\u8F91\u5668\u5931\u8D25");
         }
       }
     });

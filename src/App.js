@@ -51,7 +51,7 @@ class App extends Component {
     };
   }
 
-  componentDidMount() {
+  componentDidMount = async () => {
     document.addEventListener("fullscreenchange", this.solveScreenChange);
     document.addEventListener("webkitfullscreenchange", this.solveScreenChange);
     document.addEventListener("mozfullscreenchange", this.solveScreenChange);
@@ -99,30 +99,51 @@ class App extends Component {
     const content = urlParams.get('content');
     
     if (content) {
-      // 设置内容到编辑器
-      this.props.content.setContent(decodeURIComponent(content));
+      const decodedContent = decodeURIComponent(content);
+      
+      try {
+        // 处理外部图片
+        const processedContent = await ImageProcessor.processExternalImages(
+          decodedContent,
+          this.props.content,
+          (current, total) => {
+            // 添加进度提示
+            console.log(`处理图片进度: ${current}/${total}`);
+          }
+        );
+        
+        // 设置处理后的内容到编辑器
+        this.props.content.setContent(processedContent);
+      } catch (error) {
+        console.error('处理图片失败:', error);
+        // 如果处理失败，至少显示原始内容
+        this.props.content.setContent(decodedContent);
+      }
     }
 
-    // 自动触发粘贴
-    if (navigator.clipboard && navigator.clipboard.readText) {
-      navigator.clipboard.readText()
-        .then(async text => {
-          if (text) {
-            const instance = this.props.content.markdownEditor;
-            if (instance) {
-              // 使用现有的粘贴处理逻辑
-              await this.handlePaste(instance, {
-                clipboardData: {
-                  getData: (type) => type === 'TEXT' ? text : '',
-                  files: []
-                }
-              });
-            }
-          }
-        })
-        .catch(err => console.error('Failed to read clipboard:', err));
-    }
-  }
+    // 添加 MathJax 脚本
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js';
+    script.async = true;
+    script.id = 'MathJax-script';
+    
+    // 配置 MathJax
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true
+      },
+      svg: {
+        fontCache: 'global'
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+      }
+    };
+
+    document.head.appendChild(script);
+  };
 
   componentDidUpdate() {
     if (pluginCenter.mathjax) {
