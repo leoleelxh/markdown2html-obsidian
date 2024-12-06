@@ -1,0 +1,11 @@
+/* 插件设置页面样式 */
+.markdown2html-settings {
+    padding: 10px;
+}
+
+/* 按钮样式 */
+.markdown2html-button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+} 

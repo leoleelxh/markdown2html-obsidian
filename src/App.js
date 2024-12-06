@@ -94,6 +94,34 @@ class App extends Component {
     if (!localStorage.getItem(IMAGE_HOSTING_TYPE)) {
       localStorage.setItem(IMAGE_HOSTING_TYPE, defaultImageBedType);
     }
+    // 从 URL 参数中获取内容
+    const urlParams = new URLSearchParams(window.location.search);
+    const content = urlParams.get('content');
+    
+    if (content) {
+      // 设置内容到编辑器
+      this.props.content.setContent(decodeURIComponent(content));
+    }
+
+    // 自动触发粘贴
+    if (navigator.clipboard && navigator.clipboard.readText) {
+      navigator.clipboard.readText()
+        .then(async text => {
+          if (text) {
+            const instance = this.props.content.markdownEditor;
+            if (instance) {
+              // 使用现有的粘贴处理逻辑
+              await this.handlePaste(instance, {
+                clipboardData: {
+                  getData: (type) => type === 'TEXT' ? text : '',
+                  files: []
+                }
+              });
+            }
+          }
+        })
+        .catch(err => console.error('Failed to read clipboard:', err));
+    }
   }
 
   componentDidUpdate() {

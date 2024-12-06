@@ -1,0 +1,10 @@
+{
+  "id": "obsidian-markdown2html",
+  "name": "Markdown2HTML",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "将 Markdown 内容转换为 HTML 并在浏览器中打开",
+  "author": "Your Name",
+  "authorUrl": "https://github.com/yourusername",
+  "isDesktopOnly": false
+} 
