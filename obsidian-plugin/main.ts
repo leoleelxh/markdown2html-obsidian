@@ -1,21 +1,9 @@
-import { App, Editor, MarkdownView, Notice, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
-
-interface Markdown2HTMLSettings {
-    serverUrl: string;
-}
-
-const DEFAULT_SETTINGS: Markdown2HTMLSettings = {
-    serverUrl: 'http://localhost:3000'
-}
+import { App, Editor, MarkdownView, Notice, Plugin, TFile } from 'obsidian';
 
 export default class Markdown2HTMLPlugin extends Plugin {
-    settings: Markdown2HTMLSettings;
-
     async onload() {
-        await this.loadSettings();
-
-        // 添加新的复制功能按钮
-        this.addRibbonIcon('copy', 'Copy to Markdown2HTML', async () => {
+        // 添加新的复制功能按钮,使用 file-text 图标以区分其他插件
+        this.addRibbonIcon('file-text', '复制到 Markdown2HTML', async () => {
             const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
             if (activeView) {
                 const editor = activeView.editor;
@@ -31,27 +19,6 @@ export default class Markdown2HTMLPlugin extends Plugin {
                     // 复制到剪贴板
                     await navigator.clipboard.writeText(markedContent);
                     new Notice('内容已复制到剪贴板');
-                } catch (error: any) {
-                    console.error('Error:', error);
-                    new Notice(`复制失败：${error.message}`);
-                }
-            } else {
-                new Notice('请先打开一个 Markdown 文件');
-            }
-        });
-
-        // 保留原有的打开浏览器功能
-        this.addRibbonIcon('documents', 'Open in Markdown2HTML', async () => {
-            const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
-            if (activeView) {
-                const editor = activeView.editor;
-                const content = editor.getValue();
-                
-                try {
-                    const encodedContent = encodeURIComponent(content);
-                    const url = `${this.settings.serverUrl}?content=${encodedContent}`;
-                    window.open(url, '_blank');
-                    new Notice('已在浏览器中打开编辑器');
                 } catch (error: any) {
                     console.error('Error:', error);
                     new Notice(`复制失败：${error.message}`);
@@ -78,27 +45,6 @@ export default class Markdown2HTMLPlugin extends Plugin {
                 }
             }
         });
-
-        // 保留原有的命令
-        this.addCommand({
-            id: 'open-markdown2html',
-            name: '在浏览器中打开当前文档',
-            editorCallback: async (editor: Editor) => {
-                const content = editor.getValue();
-                try {
-                    const encodedContent = encodeURIComponent(content);
-                    const url = `${this.settings.serverUrl}?content=${encodedContent}`;
-                    window.open(url, '_blank');
-                    new Notice('已在浏览器中打开编辑器');
-                } catch (error) {
-                    console.error('Error:', error);
-                    new Notice('打开编辑器失败');
-                }
-            }
-        });
-
-        // 添加设置选项卡
-        this.addSettingTab(new Markdown2HTMLSettingTab(this.app, this));
     }
 
     // 处理本地图片路径
@@ -189,39 +135,5 @@ export default class Markdown2HTMLPlugin extends Plugin {
     // 添加 Obsidian 标记
     addObsidianMark(content: string): string {
         return `<!--obsidian-markdown2html-start-->\n${content}\n<!--obsidian-markdown2html-end-->`;
-    }
-
-    async loadSettings() {
-        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    }
-
-    async saveSettings() {
-        await this.saveData(this.settings);
-    }
-}
-
-class Markdown2HTMLSettingTab extends PluginSettingTab {
-    plugin: Markdown2HTMLPlugin;
-
-    constructor(app: App, plugin: Markdown2HTMLPlugin) {
-        super(app, plugin);
-        this.plugin = plugin;
-    }
-
-    display(): void {
-        const {containerEl} = this;
-        containerEl.empty();
-        containerEl.createEl('h2', {text: 'Markdown2HTML 设置'});
-
-        new Setting(containerEl)
-            .setName('服务器地址')
-            .setDesc('设置运行 Markdown2HTML 服务的地址')
-            .addText(text => text
-                .setPlaceholder('输入服务器地址')
-                .setValue(this.plugin.settings.serverUrl)
-                .onChange(async (value) => {
-                    this.plugin.settings.serverUrl = value;
-                    await this.plugin.saveSettings();
-                }));
     }
 } 

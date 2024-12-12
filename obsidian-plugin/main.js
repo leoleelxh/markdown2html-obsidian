@@ -28,13 +28,9 @@ __export(main_exports, {
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
-var DEFAULT_SETTINGS = {
-  serverUrl: "http://localhost:3000"
-};
 var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
   async onload() {
-    await this.loadSettings();
-    this.addRibbonIcon("copy", "Copy to Markdown2HTML", async () => {
+    this.addRibbonIcon("file-text", "\u590D\u5236\u5230 Markdown2HTML", async () => {
       const activeView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
       if (activeView) {
         const editor = activeView.editor;
@@ -44,24 +40,6 @@ var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
           const markedContent = this.addObsidianMark(processedContent);
           await navigator.clipboard.writeText(markedContent);
           new import_obsidian.Notice("\u5185\u5BB9\u5DF2\u590D\u5236\u5230\u526A\u8D34\u677F");
-        } catch (error) {
-          console.error("Error:", error);
-          new import_obsidian.Notice(`\u590D\u5236\u5931\u8D25\uFF1A${error.message}`);
-        }
-      } else {
-        new import_obsidian.Notice("\u8BF7\u5148\u6253\u5F00\u4E00\u4E2A Markdown \u6587\u4EF6");
-      }
-    });
-    this.addRibbonIcon("documents", "Open in Markdown2HTML", async () => {
-      const activeView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
-      if (activeView) {
-        const editor = activeView.editor;
-        const content = editor.getValue();
-        try {
-          const encodedContent = encodeURIComponent(content);
-          const url = `${this.settings.serverUrl}?content=${encodedContent}`;
-          window.open(url, "_blank");
-          new import_obsidian.Notice("\u5DF2\u5728\u6D4F\u89C8\u5668\u4E2D\u6253\u5F00\u7F16\u8F91\u5668");
         } catch (error) {
           console.error("Error:", error);
           new import_obsidian.Notice(`\u590D\u5236\u5931\u8D25\uFF1A${error.message}`);
@@ -86,23 +64,6 @@ var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
         }
       }
     });
-    this.addCommand({
-      id: "open-markdown2html",
-      name: "\u5728\u6D4F\u89C8\u5668\u4E2D\u6253\u5F00\u5F53\u524D\u6587\u6863",
-      editorCallback: async (editor) => {
-        const content = editor.getValue();
-        try {
-          const encodedContent = encodeURIComponent(content);
-          const url = `${this.settings.serverUrl}?content=${encodedContent}`;
-          window.open(url, "_blank");
-          new import_obsidian.Notice("\u5DF2\u5728\u6D4F\u89C8\u5668\u4E2D\u6253\u5F00\u7F16\u8F91\u5668");
-        } catch (error) {
-          console.error("Error:", error);
-          new import_obsidian.Notice("\u6253\u5F00\u7F16\u8F91\u5668\u5931\u8D25");
-        }
-      }
-    });
-    this.addSettingTab(new Markdown2HTMLSettingTab(this.app, this));
   }
   // 处理本地图片路径
   async processLocalImages(content, currentFile) {
@@ -172,26 +133,5 @@ var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
     return `<!--obsidian-markdown2html-start-->
 ${content}
 <!--obsidian-markdown2html-end-->`;
-  }
-  async loadSettings() {
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-  }
-  async saveSettings() {
-    await this.saveData(this.settings);
-  }
-};
-var Markdown2HTMLSettingTab = class extends import_obsidian.PluginSettingTab {
-  constructor(app, plugin) {
-    super(app, plugin);
-    this.plugin = plugin;
-  }
-  display() {
-    const { containerEl } = this;
-    containerEl.empty();
-    containerEl.createEl("h2", { text: "Markdown2HTML \u8BBE\u7F6E" });
-    new import_obsidian.Setting(containerEl).setName("\u670D\u52A1\u5668\u5730\u5740").setDesc("\u8BBE\u7F6E\u8FD0\u884C Markdown2HTML \u670D\u52A1\u7684\u5730\u5740").addText((text) => text.setPlaceholder("\u8F93\u5165\u670D\u52A1\u5668\u5730\u5740").setValue(this.plugin.settings.serverUrl).onChange(async (value) => {
-      this.plugin.settings.serverUrl = value;
-      await this.plugin.saveSettings();
-    }));
   }
 };
