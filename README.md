@@ -47,13 +47,18 @@
 
 确保在项目启动前，已正确配置环境变量和依赖。
 
-## Obsidian 插件使用���明
+## Obsidian 插件使用说明
 
 ### 安装插件
 
 1. 下载 `obsidian-plugin` 目录
 2. 将其复制到你的 Obsidian 插件目录（通常是 `.obsidian/plugins/obsidian-markdown2html`）
 3. 在 Obsidian 中启用插件
+
+> **安全提示**：
+> - 插件的 `data.json` 文件包含个人配置信息，请勿将其上传到公共仓库
+> - 首次安装时，请参考 `data.json.example` 创建你自己的配置文件
+> - 已在 `.gitignore` 中配置忽略 `data.json` 文件
 
 ### 使用方法
 
@@ -90,7 +95,7 @@
 - 📱 支持微信公众号、知乎和稀土掘金
 - 📊 支持数学公式
 - 🔄 支持 HTML 转 Markdown
-- 📥 支���导出 PDF 和 Markdown
+- 📥 支持导出 PDF 和 Markdown
 - 🖼️ 支持多种图床
   - GitHub 图床
   - 腾讯云 COS 图床

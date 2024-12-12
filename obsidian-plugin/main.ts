@@ -1,4 +1,5 @@
-import { App, Editor, MarkdownView, Notice, Plugin, TFile } from 'obsidian';
+import { Notice, Plugin } from 'obsidian';
+import type { App, Editor, MarkdownView, TFile } from 'obsidian';
 
 export default class Markdown2HTMLPlugin extends Plugin {
     async onload() {
