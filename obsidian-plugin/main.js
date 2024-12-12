@@ -34,7 +34,25 @@ var DEFAULT_SETTINGS = {
 var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
   async onload() {
     await this.loadSettings();
-    this.addRibbonIcon("documents", "Markdown2HTML", async () => {
+    this.addRibbonIcon("copy", "Copy to Markdown2HTML", async () => {
+      const activeView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
+      if (activeView) {
+        const editor = activeView.editor;
+        const content = editor.getValue();
+        try {
+          const processedContent = await this.processLocalImages(content, activeView.file);
+          const markedContent = this.addObsidianMark(processedContent);
+          await navigator.clipboard.writeText(markedContent);
+          new import_obsidian.Notice("\u5185\u5BB9\u5DF2\u590D\u5236\u5230\u526A\u8D34\u677F");
+        } catch (error) {
+          console.error("Error:", error);
+          new import_obsidian.Notice(`\u590D\u5236\u5931\u8D25\uFF1A${error.message}`);
+        }
+      } else {
+        new import_obsidian.Notice("\u8BF7\u5148\u6253\u5F00\u4E00\u4E2A Markdown \u6587\u4EF6");
+      }
+    });
+    this.addRibbonIcon("documents", "Open in Markdown2HTML", async () => {
       const activeView = this.app.workspace.getActiveViewOfType(import_obsidian.MarkdownView);
       if (activeView) {
         const editor = activeView.editor;
@@ -46,10 +64,26 @@ var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
           new import_obsidian.Notice("\u5DF2\u5728\u6D4F\u89C8\u5668\u4E2D\u6253\u5F00\u7F16\u8F91\u5668");
         } catch (error) {
           console.error("Error:", error);
-          new import_obsidian.Notice("\u6253\u5F00\u7F16\u8F91\u5668\u5931\u8D25");
+          new import_obsidian.Notice(`\u590D\u5236\u5931\u8D25\uFF1A${error.message}`);
         }
       } else {
         new import_obsidian.Notice("\u8BF7\u5148\u6253\u5F00\u4E00\u4E2A Markdown \u6587\u4EF6");
+      }
+    });
+    this.addCommand({
+      id: "copy-to-markdown2html",
+      name: "\u590D\u5236\u5F53\u524D\u6587\u6863\u5230\u526A\u8D34\u677F",
+      editorCallback: async (editor, view) => {
+        const content = editor.getValue();
+        try {
+          const processedContent = await this.processLocalImages(content, view.file);
+          const markedContent = this.addObsidianMark(processedContent);
+          await navigator.clipboard.writeText(markedContent);
+          new import_obsidian.Notice("\u5185\u5BB9\u5DF2\u590D\u5236\u5230\u526A\u8D34\u677F");
+        } catch (error) {
+          console.error("Error:", error);
+          new import_obsidian.Notice(`\u590D\u5236\u5931\u8D25\uFF1A${error.message}`);
+        }
       }
     });
     this.addCommand({
@@ -69,6 +103,75 @@ var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
       }
     });
     this.addSettingTab(new Markdown2HTMLSettingTab(this.app, this));
+  }
+  // 处理本地图片路径
+  async processLocalImages(content, currentFile) {
+    if (!currentFile) {
+      return content;
+    }
+    const imageRegex = /!\[(.*?)\]\((.*?)\)/g;
+    const vault = this.app.vault;
+    let processedContent = content;
+    let match;
+    while (match = imageRegex.exec(content)) {
+      const [fullMatch, altText, imagePath] = match;
+      if (!imagePath.startsWith("http://") && !imagePath.startsWith("https://")) {
+        try {
+          const resolvedPath = this.resolveImagePath(imagePath, currentFile);
+          const imageFile = vault.getAbstractFileByPath(resolvedPath);
+          if (imageFile instanceof import_obsidian.TFile) {
+            const arrayBuffer = await vault.readBinary(imageFile);
+            const base64String = this.arrayBufferToBase64(arrayBuffer);
+            const mimeType = this.getMimeType(imageFile.extension);
+            const dataUrl = `data:${mimeType};base64,${base64String}`;
+            const newImageMark = `![${altText}](obsidian-base64://${dataUrl})`;
+            processedContent = processedContent.replace(fullMatch, newImageMark);
+          }
+        } catch (error) {
+          console.error("Error processing image path:", error);
+        }
+      }
+    }
+    return processedContent;
+  }
+  // 解析图片路径（相对于当前文件）
+  resolveImagePath(imagePath, currentFile) {
+    var _a;
+    if (imagePath.startsWith("/")) {
+      return imagePath.slice(1);
+    }
+    const currentDir = ((_a = currentFile.parent) == null ? void 0 : _a.path) || "";
+    if (imagePath.startsWith("./")) {
+      imagePath = imagePath.slice(2);
+    }
+    return currentDir ? `${currentDir}/${imagePath}` : imagePath;
+  }
+  // 将 ArrayBuffer 转换为 base64 字符串
+  arrayBufferToBase64(buffer) {
+    let binary = "";
+    const bytes = new Uint8Array(buffer);
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+  }
+  // 根据文件扩展名获取 MIME 类型
+  getMimeType(extension) {
+    const mimeTypes = {
+      "png": "image/png",
+      "jpg": "image/jpeg",
+      "jpeg": "image/jpeg",
+      "gif": "image/gif",
+      "webp": "image/webp",
+      "svg": "image/svg+xml"
+    };
+    return mimeTypes[extension.toLowerCase()] || "image/png";
+  }
+  // 添加 Obsidian 标记
+  addObsidianMark(content) {
+    return `<!--obsidian-markdown2html-start-->
+${content}
+<!--obsidian-markdown2html-end-->`;
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());

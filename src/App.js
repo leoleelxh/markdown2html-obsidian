@@ -6,6 +6,7 @@ import "antd/dist/antd.css";
 import {observer, inject} from "mobx-react";
 import classnames from "classnames";
 import throttle from "lodash.throttle";
+import {message} from "antd";
 
 import Dialog from "./layout/Dialog";
 import Navbar from "./layout/Navbar";
@@ -116,7 +117,7 @@ class App extends Component {
         this.props.content.setContent(processedContent);
       } catch (error) {
         console.error('处理图片失败:', error);
-        // 如果处理���败，至少显示原始内容
+        // 如果处理失败，至少显示原始内容
         this.props.content.setContent(decodedContent);
       }
     }
@@ -307,45 +308,129 @@ class App extends Component {
     const cbData = e.clipboardData;
 
     const insertPasteContent = async (cm, content) => {
-      // 处理外部图片
-      const processedContent = await ImageProcessor.processExternalImages(
-        content,
-        this.props.content,
-        (current, total) => {
-          console.log(`处理图片进度: ${current}/${total}`);
-        }
-      );
+        try {
+            // 检查是否是来自 Obsidian 的内容
+            const obsidianStartMark = '<!--obsidian-markdown2html-start-->';
+            const obsidianEndMark = '<!--obsidian-markdown2html-end-->';
+            
+            if (content.includes(obsidianStartMark) && content.includes(obsidianEndMark)) {
+                // 提取 Obsidian 内容
+                const start = content.indexOf(obsidianStartMark) + obsidianStartMark.length;
+                const end = content.indexOf(obsidianEndMark);
+                const obsidianContent = content.substring(start, end).trim();
+                
+                // 处理本地图片路径
+                const processedContent = await this.processObsidianImages(obsidianContent);
+                
+                // 插入处理后的内容
+                const {length} = cm.getSelections();
+                cm.replaceSelections(Array(length).fill(processedContent));
+            } else {
+                // 处理普通内容
+                const processedContent = await ImageProcessor.processExternalImages(
+                    content,
+                    this.props.content,
+                    (current, total) => {
+                        console.log(`处理图片进度: ${current}/${total}`);
+                    }
+                );
 
-      const {length} = cm.getSelections();
-      cm.replaceSelections(Array(length).fill(processedContent));
-      this.setState(
-        {
-          focus: true,
-        },
-        () => {
-          this.handleChange(cm);
-        },
-      );
+                const {length} = cm.getSelections();
+                cm.replaceSelections(Array(length).fill(processedContent));
+            }
+            
+            this.setState(
+                {
+                    focus: true,
+                },
+                () => {
+                    this.handleChange(cm);
+                },
+            );
+        } catch (error) {
+            console.error('Error in insertPasteContent:', error);
+            // 如果处理失败，至少插入原始内容
+            const {length} = cm.getSelections();
+            cm.replaceSelections(Array(length).fill(content));
+            message.error('处理粘贴内容时出错');
+        }
     };
 
-    if (e.clipboardData && e.clipboardData.files) {
-      for (let i = 0; i < e.clipboardData.files.length; i++) {
-        uploadAdaptor({file: e.clipboardData.files[i], content: this.props.content});
-      }
+    try {
+        // 处理文件粘贴
+        if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length > 0) {
+            for (let i = 0; i < e.clipboardData.files.length; i++) {
+                await new Promise((resolve, reject) => {
+                    uploadAdaptor({
+                        file: e.clipboardData.files[i],
+                        content: this.props.content,
+                        onSuccess: resolve,
+                        onError: reject
+                    });
+                });
+            }
+            return;
+        }
+
+        // 处理文本粘贴
+        if (cbData) {
+            const html = cbData.getData("text/html");
+            const text = cbData.getData("TEXT");
+            await insertPasteContent(instance, text);
+
+            if (html) {
+                this.props.footer.setPasteHtmlChecked(true);
+                this.props.footer.setPasteHtml(html);
+                this.props.footer.setPasteText(text);
+            } else {
+                this.props.footer.setPasteHtmlChecked(false);
+            }
+        }
+    } catch (error) {
+        console.error('Error in handlePaste:', error);
+        message.error('粘贴处理失败');
     }
+  };
 
-    if (cbData) {
-      const html = cbData.getData("text/html");
-      const text = cbData.getData("TEXT");
-      await insertPasteContent(instance, text);
+  // 处理 Obsidian 本地图片
+  processObsidianImages = async (content) => {
+    try {
+        const imageRegex = /!\[(.*?)\]\(obsidian-base64:\/\/(data:.*?;base64,.*?)\)/g;
+        let processedContent = content;
+        let match;
+        
+        while ((match = imageRegex.exec(content)) !== null) {
+            const [fullMatch, altText, dataUrl] = match;
+            try {
+                // 从 base64 创建 Blob
+                const response = await fetch(dataUrl);
+                const blob = await response.blob();
+                
+                // 创建文件对象
+                const filename = `image_${Date.now()}.png`;
+                const file = new File([blob], filename, { type: blob.type || 'image/png' });
+                
+                // 上传到图床
+                const uploadResult = await new Promise((resolve, reject) => {
+                    uploadAdaptor({
+                        file,
+                        onSuccess: (response) => resolve(response),
+                        onError: (error) => reject(error)
+                    });
+                });
 
-      if (html) {
-        this.props.footer.setPasteHtmlChecked(true);
-        this.props.footer.setPasteHtml(html);
-        this.props.footer.setPasteText(text);
-      } else {
-        this.props.footer.setPasteHtmlChecked(false);
-      }
+                // 替换为实际的图片 URL
+                const newImageMark = `![${altText}](${uploadResult.url})`;
+                processedContent = processedContent.replace(fullMatch, newImageMark);
+            } catch (error) {
+                console.error('Error processing image:', error);
+            }
+        }
+        
+        return processedContent;
+    } catch (error) {
+        console.error('Error in processObsidianImages:', error);
+        return content; // 如果处理失败，返回原始内容
     }
   };
 
@@ -440,7 +525,7 @@ class App extends Component {
                 >
                   <section
                     id={LAYOUT_ID}
-                    data-tool="markdown2wechat编辑器"
+                    data-tool="markdown2wechat编器"
                     data-website="https://aizhuanqian.com"
                     dangerouslySetInnerHTML={{
                       __html: parseHtml,
