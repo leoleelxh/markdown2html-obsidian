@@ -1,5 +1,9 @@
-import { Notice, Plugin } from 'obsidian';
-import type { App, Editor, MarkdownView, TFile } from 'obsidian';
+import { Notice, Plugin, MarkdownView, TFile } from 'obsidian';
+import type { App, Editor } from 'obsidian';
+
+interface ClipboardError extends Error {
+    message: string;
+}
 
 export default class Markdown2HTMLPlugin extends Plugin {
     async onload() {
@@ -12,17 +16,15 @@ export default class Markdown2HTMLPlugin extends Plugin {
                 
                 try {
                     // 处理文档中的图片路径
-                    const processedContent = await this.processLocalImages(content, activeView.file);
-                    
-                    // 添加标记，表明这是来自 Obsidian 的内容
-                    const markedContent = this.addObsidianMark(processedContent);
+                    const processedContent = await this.processImages(content, activeView.file);
                     
                     // 复制到剪贴板
-                    await navigator.clipboard.writeText(markedContent);
+                    await navigator.clipboard.writeText(processedContent);
                     new Notice('内容已复制到剪贴板');
-                } catch (error: any) {
-                    console.error('Error:', error);
-                    new Notice(`复制失败：${error.message}`);
+                } catch (error) {
+                    const clipboardError = error as ClipboardError;
+                    console.error('Error:', clipboardError);
+                    new Notice(`复制失败：${clipboardError.message}`);
                 }
             } else {
                 new Notice('请先打开一个 Markdown 文件');
@@ -36,31 +38,37 @@ export default class Markdown2HTMLPlugin extends Plugin {
             editorCallback: async (editor: Editor, view: MarkdownView) => {
                 const content = editor.getValue();
                 try {
-                    const processedContent = await this.processLocalImages(content, view.file);
-                    const markedContent = this.addObsidianMark(processedContent);
-                    await navigator.clipboard.writeText(markedContent);
+                    const processedContent = await this.processImages(content, view.file);
+                    await navigator.clipboard.writeText(processedContent);
                     new Notice('内容已复制到剪贴板');
-                } catch (error: any) {
-                    console.error('Error:', error);
-                    new Notice(`复制失败：${error.message}`);
+                } catch (error) {
+                    const clipboardError = error as ClipboardError;
+                    console.error('Error:', clipboardError);
+                    new Notice(`复制失败：${clipboardError.message}`);
                 }
             }
         });
     }
 
-    // 处理本地图片路径
-    async processLocalImages(content: string, currentFile: TFile | null): Promise<string> {
+    // 处理所有图片
+    async processImages(content: string, currentFile: TFile | null): Promise<string> {
         if (!currentFile) {
             return content;
         }
 
         const imageRegex = /!\[(.*?)\]\((.*?)\)/g;
         const vault = this.app.vault;
-        let processedContent = content;
-        let match: RegExpExecArray | null;
+        let processedContent = '';
+        let lastIndex = 0;
+        let match = imageRegex.exec(content);
+        let hasLocalImages = false;
         
-        while (match = imageRegex.exec(content)) {
+        // 先处理所有图片，生成完整内容
+        while (match !== null) {
             const [fullMatch, altText, imagePath] = match;
+            
+            // 添加匹配之前的文本
+            processedContent += content.slice(lastIndex, match.index);
             
             // 检查是否是本地图片（不是 http/https 链接）
             if (!imagePath.startsWith('http://') && !imagePath.startsWith('https://')) {
@@ -70,6 +78,7 @@ export default class Markdown2HTMLPlugin extends Plugin {
                     const imageFile = vault.getAbstractFileByPath(resolvedPath);
                     
                     if (imageFile instanceof TFile) {
+                        hasLocalImages = true;
                         // 读取图片文件的二进制数据
                         const arrayBuffer = await vault.readBinary(imageFile);
                         const base64String = this.arrayBufferToBase64(arrayBuffer);
@@ -78,36 +87,57 @@ export default class Markdown2HTMLPlugin extends Plugin {
                         // 创建 base64 数据 URL
                         const dataUrl = `data:${mimeType};base64,${base64String}`;
                         
-                        // 使用特殊标记包装图片数据
-                        const newImageMark = `![${altText}](obsidian-base64://${dataUrl})`;
-                        processedContent = processedContent.replace(fullMatch, newImageMark);
+                        // 添加 base64 图片
+                        processedContent += `![${altText}](obsidian-base64://${dataUrl})`;
+                    } else {
+                        // 如果找不到图片文件，保持原样
+                        processedContent += fullMatch;
                     }
                 } catch (error) {
                     console.error('Error processing image path:', error);
+                    // 如果处理失败，保持原样
+                    processedContent += fullMatch;
                 }
+            } else {
+                // 外链图片保持原样
+                processedContent += fullMatch;
             }
+            
+            lastIndex = match.index + fullMatch.length;
+            match = imageRegex.exec(content);
         }
+        
+        // 添加剩余的文本
+        processedContent += content.slice(lastIndex);
 
+        // 如果有本地图片，添加标记
+        if (hasLocalImages) {
+            return `<!--obsidian-markdown2html-start-->\n${processedContent}\n<!--obsidian-markdown2html-end-->`;
+        }
+        
+        // 如果没有本地图片，直接返回处理后的内容
         return processedContent;
     }
 
     // 解析图片路径（相对于当前文件）
-    resolveImagePath(imagePath: string, currentFile: TFile): string {
-        if (imagePath.startsWith('/')) {
+    resolveImagePath(originalPath: string, currentFile: TFile): string {
+        if (originalPath.startsWith('/')) {
             // 如果是以 / 开头的绝对路径，直接返回（去掉开头的 /）
-            return imagePath.slice(1);
+            return originalPath.slice(1);
         }
         
         // 获取当前文件所在的目录
         const currentDir = currentFile.parent?.path || '';
         
+        // 处理路径
+        let processedPath = originalPath;
         // 如果图片路径以 ./ 开头，去掉它
-        if (imagePath.startsWith('./')) {
-            imagePath = imagePath.slice(2);
+        if (processedPath.startsWith('./')) {
+            processedPath = processedPath.slice(2);
         }
         
         // 如果当前目录不为空，拼接路径
-        return currentDir ? `${currentDir}/${imagePath}` : imagePath;
+        return currentDir ? `${currentDir}/${processedPath}` : processedPath;
     }
 
     // 将 ArrayBuffer 转换为 base64 字符串
@@ -131,10 +161,5 @@ export default class Markdown2HTMLPlugin extends Plugin {
             'svg': 'image/svg+xml'
         };
         return mimeTypes[extension.toLowerCase()] || 'image/png';
-    }
-
-    // 添加 Obsidian 标记
-    addObsidianMark(content: string): string {
-        return `<!--obsidian-markdown2html-start-->\n${content}\n<!--obsidian-markdown2html-end-->`;
     }
 } 

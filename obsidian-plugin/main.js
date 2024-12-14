@@ -36,13 +36,13 @@ var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
         const editor = activeView.editor;
         const content = editor.getValue();
         try {
-          const processedContent = await this.processLocalImages(content, activeView.file);
-          const markedContent = this.addObsidianMark(processedContent);
-          await navigator.clipboard.writeText(markedContent);
+          const processedContent = await this.processImages(content, activeView.file);
+          await navigator.clipboard.writeText(processedContent);
           new import_obsidian.Notice("\u5185\u5BB9\u5DF2\u590D\u5236\u5230\u526A\u8D34\u677F");
         } catch (error) {
-          console.error("Error:", error);
-          new import_obsidian.Notice(`\u590D\u5236\u5931\u8D25\uFF1A${error.message}`);
+          const clipboardError = error;
+          console.error("Error:", clipboardError);
+          new import_obsidian.Notice(`\u590D\u5236\u5931\u8D25\uFF1A${clipboardError.message}`);
         }
       } else {
         new import_obsidian.Notice("\u8BF7\u5148\u6253\u5F00\u4E00\u4E2A Markdown \u6587\u4EF6");
@@ -54,58 +54,75 @@ var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
       editorCallback: async (editor, view) => {
         const content = editor.getValue();
         try {
-          const processedContent = await this.processLocalImages(content, view.file);
-          const markedContent = this.addObsidianMark(processedContent);
-          await navigator.clipboard.writeText(markedContent);
+          const processedContent = await this.processImages(content, view.file);
+          await navigator.clipboard.writeText(processedContent);
           new import_obsidian.Notice("\u5185\u5BB9\u5DF2\u590D\u5236\u5230\u526A\u8D34\u677F");
         } catch (error) {
-          console.error("Error:", error);
-          new import_obsidian.Notice(`\u590D\u5236\u5931\u8D25\uFF1A${error.message}`);
+          const clipboardError = error;
+          console.error("Error:", clipboardError);
+          new import_obsidian.Notice(`\u590D\u5236\u5931\u8D25\uFF1A${clipboardError.message}`);
         }
       }
     });
   }
-  // 处理本地图片路径
-  async processLocalImages(content, currentFile) {
+  // 处理所有图片
+  async processImages(content, currentFile) {
     if (!currentFile) {
       return content;
     }
     const imageRegex = /!\[(.*?)\]\((.*?)\)/g;
     const vault = this.app.vault;
-    let processedContent = content;
-    let match;
-    while (match = imageRegex.exec(content)) {
+    let processedContent = "";
+    let lastIndex = 0;
+    let match = imageRegex.exec(content);
+    let hasLocalImages = false;
+    while (match !== null) {
       const [fullMatch, altText, imagePath] = match;
+      processedContent += content.slice(lastIndex, match.index);
       if (!imagePath.startsWith("http://") && !imagePath.startsWith("https://")) {
         try {
           const resolvedPath = this.resolveImagePath(imagePath, currentFile);
           const imageFile = vault.getAbstractFileByPath(resolvedPath);
           if (imageFile instanceof import_obsidian.TFile) {
+            hasLocalImages = true;
             const arrayBuffer = await vault.readBinary(imageFile);
             const base64String = this.arrayBufferToBase64(arrayBuffer);
             const mimeType = this.getMimeType(imageFile.extension);
             const dataUrl = `data:${mimeType};base64,${base64String}`;
-            const newImageMark = `![${altText}](obsidian-base64://${dataUrl})`;
-            processedContent = processedContent.replace(fullMatch, newImageMark);
+            processedContent += `![${altText}](obsidian-base64://${dataUrl})`;
+          } else {
+            processedContent += fullMatch;
           }
         } catch (error) {
           console.error("Error processing image path:", error);
+          processedContent += fullMatch;
         }
+      } else {
+        processedContent += fullMatch;
       }
+      lastIndex = match.index + fullMatch.length;
+      match = imageRegex.exec(content);
+    }
+    processedContent += content.slice(lastIndex);
+    if (hasLocalImages) {
+      return `<!--obsidian-markdown2html-start-->
+${processedContent}
+<!--obsidian-markdown2html-end-->`;
     }
     return processedContent;
   }
   // 解析图片路径（相对于当前文件）
-  resolveImagePath(imagePath, currentFile) {
+  resolveImagePath(originalPath, currentFile) {
     var _a;
-    if (imagePath.startsWith("/")) {
-      return imagePath.slice(1);
+    if (originalPath.startsWith("/")) {
+      return originalPath.slice(1);
     }
     const currentDir = ((_a = currentFile.parent) == null ? void 0 : _a.path) || "";
-    if (imagePath.startsWith("./")) {
-      imagePath = imagePath.slice(2);
+    let processedPath = originalPath;
+    if (processedPath.startsWith("./")) {
+      processedPath = processedPath.slice(2);
     }
-    return currentDir ? `${currentDir}/${imagePath}` : imagePath;
+    return currentDir ? `${currentDir}/${processedPath}` : processedPath;
   }
   // 将 ArrayBuffer 转换为 base64 字符串
   arrayBufferToBase64(buffer) {
@@ -127,11 +144,5 @@ var Markdown2HTMLPlugin = class extends import_obsidian.Plugin {
       "svg": "image/svg+xml"
     };
     return mimeTypes[extension.toLowerCase()] || "image/png";
-  }
-  // 添加 Obsidian 标记
-  addObsidianMark(content) {
-    return `<!--obsidian-markdown2html-start-->
-${content}
-<!--obsidian-markdown2html-end-->`;
   }
 };
